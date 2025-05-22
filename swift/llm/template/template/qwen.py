@@ -17,6 +17,9 @@ from ..utils import Context, Word, findall
 from ..vision_utils import load_audio, load_batch, load_video_ovis2
 from .llama import Llama3TemplateMeta
 from .utils import DEFAULT_SYSTEM, ChatmlTemplateMeta
+from swift.utils import get_logger
+class MaxLengthError(ValueError):
+    pass
 
 
 @dataclass
@@ -512,7 +515,31 @@ class Qwen2_5OmniTemplate(Qwen2_5VLTemplate):
                         return token_id * token_len
 
                     input_ids, labels = self._extend_tokens(input_ids, labels, idx_list, _get_new_tokens)
-
+        logger = get_logger()
+        loss_scale = None
+        if self.max_length is not None:
+            if self.truncation_strategy == 'delete' and len(input_ids) > self.max_length:
+                raise MaxLengthError(f'Current length of row({len(input_ids)}) is larger'
+                                     f' than the max_length({self.max_length}).')
+            elif self.truncation_strategy == 'right':
+                input_ids = input_ids[:self.max_length]
+                if labels is not None:
+                    labels = labels[:self.max_length]
+                if loss_scale is not None:
+                    loss_scale = loss_scale[:self.max_length]
+            else:
+                if len(input_ids) > self.max_length:
+                    logger.warning_once(
+                        'Input data was left-truncated because its length exceeds `max_length` (input length: '
+                        f'{len(input_ids)}, max_length: {self.max_length}). '
+                        'This may cause loss of important tokens (e.g., image tokens) and lead to errors. '
+                        'To avoid this, consider increasing `max_length` or pre-filtering long sequences.',
+                        hash_id='max_length_check')
+                input_ids = input_ids[-self.max_length:]
+                if labels is not None:
+                    labels = labels[-self.max_length:]
+                if loss_scale is not None:
+                    loss_scale = loss_scale[-self.max_length:]
         encoded['input_ids'] = input_ids
         encoded['labels'] = labels
         encoded.update(media_inputs)
