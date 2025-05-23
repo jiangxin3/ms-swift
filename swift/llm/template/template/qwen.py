@@ -518,7 +518,7 @@ class Qwen2_5OmniTemplate(Qwen2_5VLTemplate):
         logger = get_logger()
         loss_scale = None
         if self.max_length is not None:
-            if self.truncation_strategy == 'delete' and len(input_ids) > self.max_length:
+            if (self.truncation_strategy == 'delete' or self.truncation_strategy == 'raise') and len(input_ids) > self.max_length:
                 raise MaxLengthError(f'Current length of row({len(input_ids)}) is larger'
                                      f' than the max_length({self.max_length}).')
             elif self.truncation_strategy == 'right':
