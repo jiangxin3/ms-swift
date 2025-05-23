@@ -167,6 +167,9 @@ class MegatronArguments(ExtraMegatronArguments):
     num_workers: int = 4
     no_create_attention_mask_in_dataloader: bool = True
 
+    # extra_args for megatron
+    extra_megatron_kwargs: Optional[Union[dict, str]] = None
+
     def _set_default(self):
         if self.num_query_groups is None:
             self.num_query_groups = 1
@@ -230,16 +233,19 @@ class MegatronArguments(ExtraMegatronArguments):
         self._init_mixed_precision()
 
         self.tensorboard_dir = to_abspath(self.tensorboard_dir)
+        self.extra_megatron_kwargs = ModelArguments.parse_to_dict(self.extra_megatron_kwargs)
 
     def _args_to_argv(self) -> Tuple[List[Any], Dict[str, Any]]:
         new_args = []
         args_dict = asdict(self)
         extra_args = {}
+        extra_megatron_kwargs = args_dict.pop('extra_megatron_kwargs')
+        args_dict.update(extra_megatron_kwargs)
         for k, value in args_dict.items():
-            if k == 'recompute_modules' and version.parse(megatron.core.__version__) < version.parse('0.12'):
-                continue
-            if k not in MegatronArguments.__annotations__:
+            if k not in MegatronArguments.__annotations__ and k not in extra_megatron_kwargs:
                 extra_args[k] = value
+                continue
+            if k == 'recompute_modules' and version.parse(megatron.core.__version__) < version.parse('0.12'):
                 continue
             if value is None or value is False:
                 continue
