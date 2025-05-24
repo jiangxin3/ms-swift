@@ -18,9 +18,7 @@ from ..utils import Context, Word, findall
 from ..vision_utils import load_audio, load_batch, load_video_ovis2
 from .llama import Llama3TemplateMeta
 from .utils import DEFAULT_SYSTEM, ChatmlTemplateMeta
-from swift.utils import get_logger
-class MaxLengthError(ValueError):
-    pass
+
 
 
 @dataclass
@@ -522,10 +520,13 @@ class Qwen2_5OmniTemplate(Qwen2_5VLTemplate):
                         return token_id * token_len
 
                     input_ids, labels = self._extend_tokens(input_ids, labels, idx_list, _get_new_tokens)
+        from swift.utils import get_logger
+        class MaxLengthError(ValueError):
+            pass
         logger = get_logger()
         loss_scale = None
         if self.max_length is not None:
-            if (self.truncation_strategy == 'delete' or self.truncation_strategy == 'raise') and len(input_ids) > self.max_length:
+            if self.truncation_strategy == 'raise' and len(input_ids) > self.max_length:
                 raise MaxLengthError(f'Current length of row({len(input_ids)}) is larger'
                                      f' than the max_length({self.max_length}).')
             elif self.truncation_strategy == 'right':
