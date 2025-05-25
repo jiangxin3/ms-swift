@@ -520,11 +520,28 @@ class Qwen2_5OmniTemplate(Qwen2_5VLTemplate):
                         return token_id * token_len
 
                     input_ids, labels = self._extend_tokens(input_ids, labels, idx_list, _get_new_tokens)
+        encoded['input_ids'] = input_ids
+        encoded['labels'] = labels
+        encoded.update(media_inputs)
+        return encoded
+    
+    def _encode_truncated(self, inputs):
+        if self.mode in {'vllm', 'lmdeploy'}:
+            encoded = Template._encode(self, inputs)
+            for key in ['images', 'audios', 'videos']:
+                encoded[key] = getattr(inputs, key)
+        else:
+            encoded = self._encode(inputs)
+
+        input_ids = encoded.get('input_ids')
+        labels = encoded.get('labels')
+        loss_scale = encoded.get('loss_scale')
+        
         from swift.utils import get_logger
         class MaxLengthError(ValueError):
             pass
         logger = get_logger()
-        loss_scale = None
+        
         if self.max_length is not None:
             if self.truncation_strategy == 'raise' and len(input_ids) > self.max_length:
                 raise MaxLengthError(f'Current length of row({len(input_ids)}) is larger'
@@ -548,9 +565,10 @@ class Qwen2_5OmniTemplate(Qwen2_5VLTemplate):
                     labels = labels[-self.max_length:]
                 if loss_scale is not None:
                     loss_scale = loss_scale[-self.max_length:]
+                    
         encoded['input_ids'] = input_ids
         encoded['labels'] = labels
-        encoded.update(media_inputs)
+        encoded['loss_scale'] = loss_scale
         return encoded
 
     def _post_encode(self, model, inputs: Dict[str, Any]) -> Dict[str, Any]:
