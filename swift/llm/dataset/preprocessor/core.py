@@ -179,7 +179,10 @@ class RowPreprocessor:
                     self._check_rejected_response(r)
                     self._cast_images(r)
             except Exception as e:
-                if strict:
+                if isinstance(e, MaxLengthError):
+                    logger.warning('MaxLengthError: 输入超出最大长度限制，已跳过该条数据。')
+                    row = []
+                elif strict:
                     logger.warning('To avoid errors, you can pass `strict=False`.')
                     raise
                 if isinstance(e, MaxLengthError) and ignore_max_length_error:
